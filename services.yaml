@@ -1,0 +1,70 @@
+# The three services that replace packages/yard_maintenance.yaml's scripts.
+#
+# script.yard_seed_helpers has NO equivalent here and that is the point of the
+# rewrite: it existed only because a fresh input_datetime comes up seeded to
+# TODAY, and it destroyed real history if it ever ran twice. Stored state has
+# no such value to correct.
+
+log_task:
+  fields:
+    key:
+      required: true
+      example: mow
+      selector:
+        select:
+          options:
+            - fertilizer
+            - pre_emergent
+            - weed_control
+            - grub_control
+            - fungicide
+            - lime
+            - soil_test
+            - aeration
+            - overseed
+            - mow
+            - line_trim
+            - edging
+    when:
+      required: false
+      selector:
+        datetime:
+
+log_plant_task:
+  fields:
+    slot:
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          max: 32
+          step: 1
+          mode: box
+    action:
+      required: true
+      selector:
+        select:
+          options:
+            - prune
+            - treat
+    when:
+      required: false
+      selector:
+        datetime:
+
+blade_changed:
+  fields:
+    at_hours:
+      required: false
+      example: 12
+      selector:
+        number:
+          min: 0
+          max: 500
+          step: 0.5
+          mode: box
+    when:
+      required: false
+      selector:
+        datetime:

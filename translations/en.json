@@ -1,0 +1,84 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Yard maintenance",
+        "description": "Tracks lawn, turf and plant work, and keeps a mow ledger.",
+        "data": {
+          "mower_entity": "Robot mower (optional)",
+          "plant_slots": "Plant slots"
+        },
+        "data_description": {
+          "mower_entity": "Its sessions stamp the mow date and accumulate blade wear. Leave empty to log every mow by hand.",
+          "plant_slots": "How many plants this yard tracks. A slot contributes nothing until it is given a name."
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Yard maintenance is already set up. Its entity ids are unprefixed, so a second yard would take _2 on every one of them."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Yard maintenance",
+        "data": {
+          "mower_entity": "Robot mower (optional)",
+          "plant_slots": "Plant slots"
+        },
+        "data_description": {
+          "mower_entity": "Its sessions stamp the mow date and accumulate blade wear.",
+          "plant_slots": "Lowering this removes the highest-numbered slots' entities. Their stored values are kept, so raising it again brings them back."
+        }
+      }
+    }
+  },
+  "services": {
+    "log_task": {
+      "name": "Log a yard task",
+      "description": "Record that a dated lawn or turf task just happened.",
+      "fields": {
+        "key": {
+          "name": "Task",
+          "description": "Which task to stamp, for example mow, fertilizer or aeration."
+        },
+        "when": {
+          "name": "When",
+          "description": "Defaults to now. Set it to backdate a job."
+        }
+      }
+    },
+    "log_plant_task": {
+      "name": "Log a plant task",
+      "description": "Record a prune or a treatment against one plant slot.",
+      "fields": {
+        "slot": {
+          "name": "Slot",
+          "description": "Which plant slot, counting from 1."
+        },
+        "action": {
+          "name": "Action",
+          "description": "prune or treat."
+        },
+        "when": {
+          "name": "When",
+          "description": "Defaults to now."
+        }
+      }
+    },
+    "blade_changed": {
+      "name": "Record a blade change",
+      "description": "Start the wear clock over on a new blade.",
+      "fields": {
+        "at_hours": {
+          "name": "Starting hours",
+          "description": "Hours already on the blade. Use this when fitting a used blade, or when seeding an estimate rather than claiming the blade is new."
+        },
+        "when": {
+          "name": "When",
+          "description": "Defaults to now."
+        }
+      }
+    }
+  }
+}

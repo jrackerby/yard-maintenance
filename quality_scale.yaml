@@ -1,0 +1,117 @@
+# Self-assessment against the Home Assistant integration quality scale.
+#
+# LAW.md §15 makes the scale this estate's build standard, and TOOLS.md records
+# why this file is the only gate there is: hassfest's `validate_iqs_file` opens
+# with `if not integration.core: return`, so a custom component is never checked
+# against the scale, and a `quality_scale` key in the manifest is a self-claim
+# with nothing behind it. No such key is declared in manifest.json.
+#
+# Rule names carried from custom_components/tempest_wx/quality_scale.yaml,
+# which read them from ALL_RULES in core's script/hassfest/quality_scale.py.
+# That is a derived copy, not the source -- re-read ALL_RULES before trusting
+# this list to be complete on a newer core.
+#
+# Honest `todo`s. A rule marked `done` here has actually been done.
+
+rules:
+  # --- Bronze ---
+  action-setup: todo
+  # ^ The three services are registered in async_setup_entry rather than
+  #   async_setup, so they do not exist until an entry is loaded. Correct for
+  #   this integration -- every one of them writes to a specific yard's store
+  #   and is meaningless without one -- but the rule asks for registration at
+  #   setup time with a validity check per call, and that has not been done.
+  appropriate-polling: done
+  # ^ Hourly. Nothing here changes without a write, which refreshes
+  #   immediately; the only thing that moves on its own is the clock, and the
+  #   table's finest unit is a whole day. See coordinator.py.
+  brands: todo  # no icon/logo submitted to home-assistant/brands; private integration
+  common-modules: done  # coordinator.py, entity.py
+  config-flow: done
+  config-flow-test-coverage: todo  # needs pytest-homeassistant-custom-component
+  dependency-transparency: done  # no third-party requirements at all
+  docs-actions: done  # README.md documents all three services
+  docs-conditions: done  # none provided
+  docs-triggers: done  # none provided
+  docs-high-level-description: done  # README.md
+  docs-installation-instructions: done  # README.md
+  docs-removal-instructions: done  # README.md
+  entity-event-setup: done
+  # ^ The mower state listener is registered in async_setup_entry and torn
+  #   down through entry.async_on_unload.
+  entity-unique-id: done  # f"{DOMAIN}_{key}" on every entity
+  has-entity-name: done  # _attr_has_entity_name = True on YardEntity
+  runtime-data: done  # entry.runtime_data, typed via YardConfigEntry
+  test-before-configure: todo
+  # ^ DELIBERATE, AND RECORDED AS A DEVIATION RATHER THAN SKIPPED (LAW §15).
+  #   There is nothing to test a connection to: this integration reads no
+  #   service and no device. The mower is optional and is a local entity id,
+  #   not a credential. A flow that "verified" something here would be exactly
+  #   the check LAW §9 warns about -- one that certifies green on a channel
+  #   the integration does not use.
+  test-before-setup: done  # async_config_entry_first_refresh
+  unique-config-entry: done  # single_instance_allowed; see config_flow.py
+
+  # --- Silver ---
+  action-exceptions: todo
+  # ^ log_plant_task warns and returns on an out-of-range slot instead of
+  #   raising ServiceValidationError. The warning is the right level (LAW §15:
+  #   a named thing that does not exist needs an edit), but the caller is not
+  #   told.
+  config-entry-unloading: done  # unloads exactly the platforms forwarded
+  docs-configuration-parameters: done  # README.md
+  docs-installation-parameters: done  # README.md
+  entity-unavailable: done
+  # ^ Applied where it GOVERNS, not where it sounds relevant (LAW §15). The
+  #   coordinator never raises UpdateFailed and every entity is available:
+  #   there is no service to lose, and a yard tracker that vanishes when it
+  #   cannot compute is the monitor whose blind spot correlates with what it
+  #   monitors (LAW §11). The rule's other half DOES govern and is adopted:
+  #   binary_sensor.yard_blade_due goes unavailable when the blade's change
+  #   date was never recorded, because unset is not `off`.
+  integration-owner: done  # @jrackerby
+  log-when-unavailable: todo  # nothing can be unavailable; no crossing to log
+  parallel-updates: todo  # not declared on any platform
+  reauthentication-flow: done  # no credentials exist to expire
+  test-coverage: todo
+  # ^ tests/ covers the pure table with no HA at all, and the port itself was
+  #   proved against the Jinja macro it replaces before that macro was deleted
+  #   (tools/archive/yard_port_equivalence.py). The HA-facing entity classes
+  #   and the mow state machine are NOT covered; that needs
+  #   pytest-homeassistant-custom-component, which is not installed here.
+
+  # --- Gold / Platinum: not targeted. LAW §15 sets Silver as the target for
+  #     anything reading a device, a service, or another integration's
+  #     entities -- this reads one mower entity, so Silver applies. Recorded as
+  #     todo rather than exempt so the gap stays visible.
+  devices: done  # one service device, "Yard"
+  diagnostics: todo
+  discovery: todo  # nothing to discover
+  discovery-update-info: todo
+  docs-data-update: done  # README.md explains the hourly recompute
+  docs-examples: done  # README.md carries service call examples
+  docs-known-limitations: done
+  # ^ README.md records the blade-hours undercount (GH-548) and the fixed
+  #   plant slot count.
+  docs-supported-devices: done  # README.md
+  docs-supported-functions: done  # README.md
+  docs-troubleshooting: todo
+  dynamic-devices: todo  # one yard per entry, by design
+  entity-category: todo
+  # ^ The editable intervals and the plant species/notes are arguably
+  #   CONFIG/DIAGNOSTIC rather than primary. Left undeclared because the board
+  #   reads several of them and an entity category change moves them out of
+  #   the default dashboard without moving their ids.
+  entity-device-class: done  # problem on both overdue signals
+  entity-disabled-by-default: todo
+  # ^ 24 plant text entities on a yard with no plants declared is real
+  #   registry noise. Worth revisiting once the inventory is filled in.
+  entity-translations: done  # strings.json + translations/en.json
+  exception-translations: todo
+  icon-translations: todo  # icons set per entity instead
+  reconfiguration-flow: done  # options flow changes mower and slot count
+  repair-issues: todo
+  stale-devices: todo  # one yard per entry; nothing goes stale
+  inject-websession: todo  # no HTTP session is used at all
+  strict-typing: todo  # annotated throughout, but not py.typed and not mypy-clean
+  async-dependency: done  # no third-party dependency; no blocking I/O
