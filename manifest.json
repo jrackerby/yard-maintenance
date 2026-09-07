@@ -3,10 +3,10 @@
   "name": "Yard Maintenance",
   "codeowners": ["@jrackerby"],
   "config_flow": true,
-  "documentation": "https://github.com/jrackerby/HA/blob/master/custom_components/yard_maintenance/README.md",
+  "documentation": "https://github.com/jrackerby/yard-maintenance/blob/master/README.md",
   "integration_type": "service",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/jrackerby/HA/issues",
+  "issue_tracker": "https://github.com/jrackerby/yard-maintenance/issues",
   "requirements": [],
   "version": "0.1.0"
 }
