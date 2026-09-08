@@ -4,7 +4,7 @@ Tracks lawn, turf and plant work; keeps a mow ledger and a blade-wear clock.
 
 Replaces `packages/yard_maintenance.yaml` (87 `input_*` helpers, 5 template
 sensors, 3 binary sensors, 4 automations, 3 scripts) and
-`custom_templates/yard_tasks.jinja`. GH-605.
+`custom_templates/yard_tasks.jinja`.
 
 ## Why this is a component and not a package
 
@@ -25,7 +25,7 @@ The package worked. Three things it could not do:
 
 ## Three states, not two
 
-`unset`, `overdue`, and neither are different facts (LAW §11). A task nobody
+`unset`, `overdue`, and neither are different facts. A task nobody
 has ever recorded is **not** overdue — there is no anchor to be late against —
 but it is also not done. Unset rows are surfaced separately in `unset_items`
 and never folded into the due count. A rollup that reported them green would
@@ -101,7 +101,7 @@ was missed — the cut is real, its duration is not known.
 
 ## Known limitations
 
-- **Blade hours are a floor, not a total (GH-548).** Segway keeps blade wear in
+- **Blade hours are a floor, not a total.** Segway keeps blade wear in
   the phone app and exposes none of it over the API, so the figure here is
   accumulated only from sessions this estate observed. Any cut it did not see
   is missing. `binary_sensor.yard_blade_due` therefore fires **late** rather
@@ -110,14 +110,29 @@ was missed — the cut is real, its duration is not known.
   change and a reload, not something that happens at runtime.
 - **`Mixed` grass resolves to `unknown`.** A mixed stand has no single
   renovation window, and picking the larger half would be a schedule built on a
-  guess (LAW §14).
+  guess.
 
 ## Installation
 
-In-tree at `custom_components/yard_maintenance/`, so a `git push ha master`
-plus a Home Assistant restart installs it. Then add it from
-**Settings → Devices & Services → Add Integration → Yard Maintenance**, and
-optionally point it at a `lawn_mower` entity.
+### HACS
+
+1. In Home Assistant: **HACS → ⋮ → Custom repositories**.
+2. Add `https://github.com/jrackerby/yard-maintenance` with category **Integration**.
+3. Install **Yard Maintenance**, then restart Home Assistant.
+4. **Settings → Devices & Services → Add Integration → "Yard Maintenance"**.
+
+### Manual
+
+The integration lives at the repository **root**, not under
+`custom_components/` — `hacs.json` declares `content_in_root: true`. To install
+by hand, copy this repository's contents into
+`config/custom_components/yard_maintenance/` and restart Home Assistant.
+
+Either way a `custom_components/` change needs a **full Home Assistant
+restart**; `homeassistant.reload_core_config` does not re-import a custom
+component.
+
+Once added, optionally point it at a `lawn_mower` entity.
 
 One instance only. Every entity id here is unprefixed, so a second entry would
 take `_2` on all of them and any dashboard would keep reading the first.
