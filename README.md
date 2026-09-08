@@ -103,7 +103,7 @@ was missed — the cut is real, its duration is not known.
 
 - **Blade hours are a floor, not a total.** Segway keeps blade wear in
   the phone app and exposes none of it over the API, so the figure here is
-  accumulated only from sessions this estate observed. Any cut it did not see
+  accumulated only from sessions this integration observed. Any cut it missed
   is missing. `binary_sensor.yard_blade_due` therefore fires **late** rather
   than early, which is the argument for a conservative default life.
 - **Plant slots are a fixed count per config entry.** Changing it is an options

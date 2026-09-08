@@ -154,8 +154,8 @@ BLADE_BASIS: Final = (
     "accumulated from observed mow sessions; a floor, not a total"
 )
 
-ATTRIBUTION: Final = "Derived in the estate from recorded yard work"
-MANUFACTURER: Final = "Estate"
+ATTRIBUTION: Final = "Derived from recorded yard work"
+MANUFACTURER: Final = "Yard Maintenance"
 
 # Mower states. The ledger interlocks on its own session stamp rather than on
 # the mower's state, deliberately: a lost uplink resolves to `unknown`, and
