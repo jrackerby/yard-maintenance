@@ -62,11 +62,11 @@ class YardBladeDueBinarySensor(YardEntity, BinarySensorEntity):
     overrides `available` to say so. A blade whose change was never recorded
     is not a blade that is fine: unavailable keeps it out of the overdue
     digest -- the same treatment an unset dated task gets -- while still
-    reading differently from a healthy blade on any surface. LAW §11: `ok at
+    reading differently from a healthy blade on any surface. `ok at
     zero` and `could not read` do not collapse.
 
     It fires on an UNDERCOUNT, because the hours behind it are accumulated
-    only from sessions the estate observed (GH-548), so it is late rather than
+    only from sessions the installation observed, so it is late rather than
     early by construction. That is the argument for leaving the default life
     at the conservative end.
     """

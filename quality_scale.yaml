@@ -1,6 +1,6 @@
 # Self-assessment against the Home Assistant integration quality scale.
 #
-# LAW.md §15 makes the scale this estate's build standard, and TOOLS.md records
+# The scale is this project's build standard. It is also recorded
 # why this file is the only gate there is: hassfest's `validate_iqs_file` opens
 # with `if not integration.core: return`, so a custom component is never checked
 # against the scale, and a `quality_scale` key in the manifest is a self-claim
@@ -43,11 +43,11 @@ rules:
   has-entity-name: done  # _attr_has_entity_name = True on YardEntity
   runtime-data: done  # entry.runtime_data, typed via YardConfigEntry
   test-before-configure: todo
-  # ^ DELIBERATE, AND RECORDED AS A DEVIATION RATHER THAN SKIPPED (LAW §15).
+  # ^ DELIBERATE, AND RECORDED AS A DEVIATION RATHER THAN SKIPPED.
   #   There is nothing to test a connection to: this integration reads no
   #   service and no device. The mower is optional and is a local entity id,
   #   not a credential. A flow that "verified" something here would be exactly
-  #   the check LAW §9 warns about -- one that certifies green on a channel
+  #   the check warns about -- one that certifies green on a channel
   #   the integration does not use.
   test-before-setup: done  # async_config_entry_first_refresh
   unique-config-entry: done  # single_instance_allowed; see config_flow.py
@@ -55,18 +55,18 @@ rules:
   # --- Silver ---
   action-exceptions: todo
   # ^ log_plant_task warns and returns on an out-of-range slot instead of
-  #   raising ServiceValidationError. The warning is the right level (LAW §15:
+  #   raising ServiceValidationError. The warning is the right level (
   #   a named thing that does not exist needs an edit), but the caller is not
   #   told.
   config-entry-unloading: done  # unloads exactly the platforms forwarded
   docs-configuration-parameters: done  # README.md
   docs-installation-parameters: done  # README.md
   entity-unavailable: done
-  # ^ Applied where it GOVERNS, not where it sounds relevant (LAW §15). The
+  # ^ Applied where it GOVERNS, not where it sounds relevant. The
   #   coordinator never raises UpdateFailed and every entity is available:
   #   there is no service to lose, and a yard tracker that vanishes when it
   #   cannot compute is the monitor whose blind spot correlates with what it
-  #   monitors (LAW §11). The rule's other half DOES govern and is adopted:
+  #   monitors. The rule's other half DOES govern and is adopted:
   #   binary_sensor.yard_blade_due goes unavailable when the blade's change
   #   date was never recorded, because unset is not `off`.
   integration-owner: done  # @jrackerby
@@ -80,7 +80,7 @@ rules:
   #   and the mow state machine are NOT covered; that needs
   #   pytest-homeassistant-custom-component, which is not installed here.
 
-  # --- Gold / Platinum: not targeted. LAW §15 sets Silver as the target for
+  # --- Gold / Platinum: not targeted. Silver is set as the target for
   #     anything reading a device, a service, or another integration's
   #     entities -- this reads one mower entity, so Silver applies. Recorded as
   #     todo rather than exempt so the gap stays visible.
@@ -91,7 +91,7 @@ rules:
   docs-data-update: done  # README.md explains the hourly recompute
   docs-examples: done  # README.md carries service call examples
   docs-known-limitations: done
-  # ^ README.md records the blade-hours undercount (GH-548) and the fixed
+  # ^ README.md records the blade-hours undercount and the fixed
   #   plant slot count.
   docs-supported-devices: done  # README.md
   docs-supported-functions: done  # README.md

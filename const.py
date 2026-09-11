@@ -1,7 +1,7 @@
 """Constants for the yard maintenance integration.
 
-Everything here moved verbatim in meaning from `custom_templates/
-yard_tasks.jinja`, which this component replaces (GH-605). Where a number
+Everything here moved verbatim in meaning from a Jinja macro (
+yard_tasks.jinja`, which this component replaces. Where a number
 changed, it is called out on the line.
 """
 
@@ -24,7 +24,7 @@ STORAGE_VERSION: Final = 1
 # up claiming today.
 #
 # It is kept anyway, as the WIRE value for "never recorded", because the three
-# states are still three (LAW §11: `ok at zero` and `could not read` do not
+# states are still three (`ok at zero` and `could not read` do not
 # collapse) and because a stored 0 and a stored None must resolve identically
 # for a slot nobody has touched. Compare against it, never construct it.
 EPOCH_2000: Final = 946684800
@@ -53,7 +53,7 @@ GRASS_UNSET: Final = "Not set"
 # entity the same way it was for the input_select: a picker with no stored
 # value must not assert a grass type nobody chose. `Mixed` resolves to unknown
 # rather than to the larger half -- a mixed stand has no single renovation
-# window and guessing one would be a schedule built on nothing (LAW §14).
+# window and guessing one would be a schedule built on nothing.
 GRASS_OPTIONS: Final[tuple[str, ...]] = (
     (GRASS_UNSET,) + COOL_SEASON + WARM_SEASON + ("Mixed",)
 )
@@ -147,7 +147,7 @@ DEFAULT_PLANT_PRUNE_INTERVAL: Final = 365.0
 DEFAULT_PLANT_TREAT_INTERVAL: Final = 365.0
 
 # Blade wear is accumulated from observed mow sessions because the cloud will
-# not give it (GH-548): Segway keeps blade wear in the phone app and exposes
+# not give it: Segway keeps blade wear in the phone app and exposes
 # none of it. The figure is only ever as good as the sessions this ledger
 # closes, which is why it is documented as a floor, never a total.
 BLADE_BASIS: Final = (
