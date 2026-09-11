@@ -1,27 +1,36 @@
 # Yard Maintenance
 
-Tracks lawn, turf and plant work; keeps a mow ledger and a blade-wear clock.
+Tracks recurring lawn, turf and plant work against a per-task cadence; keeps a
+mow ledger and a blade-wear clock.
 
-Replaces `packages/yard_maintenance.yaml` (87 `input_*` helpers, 5 template
-sensors, 3 binary sensors, 4 automations, 3 scripts) and
-`custom_templates/yard_tasks.jinja`.
+Each task has an interval and a last-done date. The integration holds one
+table — which jobs are overdue, which are due soon, which have never been
+recorded — recomputes it on every write and hourly otherwise, and publishes it
+as entities. Logging a job is one action call, so a dashboard button or an
+automation can do it.
 
-## Why this is a component and not a package
+**Devices supported: none, except optionally a `lawn_mower`.** Everything else
+is a date somebody recorded.
 
-The package worked. Three things it could not do:
+## Why a component rather than helpers and templates
+
+This is normally built with `input_datetime` helpers and template sensors.
+That works, and hits three walls worth knowing about before you start:
 
 - **A fresh `input_datetime` comes up seeded to TODAY**, so an untouched yard
-  asserted that all twelve jobs had just been done. The workaround was
-  `script.yard_seed_helpers`: a gated one-shot that wrote a `1970-01-01`
-  sentinel over every date and disarmed itself, and which destroyed real
-  history if it ever ran twice. **That script has no equivalent here.** A
-  stored `None` is unambiguously "never recorded".
-- **A package cannot create a helper at runtime**, so plant slots were capped
-  at 8 and the ceiling had to be declared in two files with a join test
-  keeping them honest. It is now one number in the config entry.
-- The task rule had to be a **Jinja macro returning a JSON string**, because
-  five entities needed the same answer and that was the only way to write it
-  once. A syntax error took every reader unavailable at once.
+  asserts that every job has just been done — indistinguishable from a yard
+  someone actually maintains. The usual workaround is a one-shot script writing
+  a `1970-01-01` sentinel over every date, which destroys real history if it
+  ever runs twice. Here a stored `None` is unambiguously "never recorded", and
+  no such script exists.
+- **YAML cannot create a helper at runtime**, so a plant count has to be a
+  compile-time ceiling declared wherever the helpers and the templates each
+  live. Here it is one number in the config entry.
+- **The task rule ends up a Jinja macro returning a JSON string**, because
+  several entities need the same answer and that is the only way to write it
+  once. A syntax error then takes every reader unavailable at the same moment.
+  Here the rule is `tasks.py`, which imports nothing from `homeassistant` and
+  is unit-tested.
 
 ## Three states, not two
 
@@ -33,10 +42,11 @@ be the silent-empty failure this tracker exists to refuse.
 
 ## Entities
 
-One service device, **Yard**. The device name is a contract: with
+One service device, **Yard**. The device name is part of the entity ids: with
 `has_entity_name`, Home Assistant slugifies `<device> <entity>`, so "Yard" is
-what reproduces `sensor.yard_maintenance_due_count` and the rest of the ids the
-dashboards already read. Renaming it silently repoints every one of them.
+what produces `sensor.yard_maintenance_due_count` and the rest. Renaming the
+device silently repoints every one of them, and anything reading the old ids
+goes unavailable.
 
 ### Read-only
 
@@ -47,7 +57,7 @@ dashboards already read. Renaming it silently repoints every one of them.
 | `sensor.yard_days_since_mow` | Days since the last recorded cut; `unknown` when none. |
 | `sensor.yard_blade_hours` | Hours on the current blade. See the limitation below. |
 | `sensor.yard_grass_program` | `cool` / `warm` / `unknown`, plus the renovation window and the cadence table. |
-| `sensor.yard_mow_sessions` | Sessions this ledger has closed. Replaces `counter.yard_mow_sessions`. |
+| `sensor.yard_mow_sessions` | Sessions this ledger has closed. |
 | `binary_sensor.yard_maintenance_overdue` | Anything past cadence. |
 | `binary_sensor.yard_blade_due` | Blade at rated life. **Unavailable** while the change date is unrecorded — unset is not `off`. |
 | `binary_sensor.yard_renovation_window_open` | Whether today is inside the aeration window. |
@@ -135,7 +145,8 @@ component.
 Once added, optionally point it at a `lawn_mower` entity.
 
 One instance only. Every entity id here is unprefixed, so a second entry would
-take `_2` on all of them and any dashboard would keep reading the first.
+take `_2` on all of them and anything already configured would keep reading the
+first.
 
 ## Removal
 
@@ -165,10 +176,9 @@ tools/run_tests.sh
 `const.py` import nothing from `homeassistant`, and the suite loads them by
 file path so that stays true.
 
-The port itself was proved rather than asserted: before
-`custom_templates/yard_tasks.jinja` was deleted,
-`tools/archive/yard_port_equivalence.py` drove the old macro and the new
-`tasks.py` from one scenario set and diffed every field of every row across 64
-comparisons. It caught two real defects — a rounding mode and the
-`unknown`-as-plant-name sentinel — neither of which is findable by reading
-either implementation alone.
+The table was ported from a Jinja implementation and the port was proved
+rather than asserted: both were driven from one scenario set and every field of
+every row diffed across 64 comparisons before the old one was deleted. That
+caught two real defects — a rounding mode, and an `unknown`-as-plant-name
+sentinel — neither of which is findable by reading either implementation
+alone.
