@@ -12,7 +12,7 @@ of them exactly, and no dashboard has to change for the read-only half of the
 migration.
 
 Rename this device and every one of those ids changes silently, on a surface
-that will keep rendering the last value it saw. TOOLS.md: ids are assigned at
+that will keep rendering the last value it saw. ids are assigned at
 creation and never update, and a platform that finds its id occupied takes
 `_2` and never gives it back -- which is also why migration must delete the
 old template rows from the registry before this component starts, rather than
@@ -53,7 +53,7 @@ class YardEntity(CoordinatorEntity[YardCoordinator]):
     def available(self) -> bool:
         """Always available.
 
-        LAW §11: the coordinator never raises, and every entity overrides
+        the coordinator never raises, and every entity overrides
         `available` to true. A tracker that disappears when it cannot compute
         is the failure the contract exists to refuse -- and unlike a device
         integration there is nothing here to be unreachable FROM. The one

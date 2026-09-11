@@ -1,6 +1,6 @@
-"""Self-test for the yard task table. GH-605.
+"""Self-test for the yard task table.
 
-WHY THIS EXISTS. LAW §4: every assertion set needs a self-test proving it CAN
+WHY THIS EXISTS. every assertion set needs a self-test proving it CAN
 fail. The table is one rule read by six sensors, so a mistake in it is not one
 wrong entity -- it is every yard entity wrong the same way. It is also the
 exact shape that rots unnoticed: a maintenance rollup reads "0 due" on a
@@ -12,7 +12,7 @@ most, because both of their failure modes are silent green.
 
 WHAT THIS DOES NOT PROVE. It runs with no Home Assistant, so it says nothing
 about whether the entities exist, whether the store round-trips, or what the
-Navimow reports. Those need the estate (LAW §9). What it does prove is the
+Navimow reports. Those need the installation. What it does prove is the
 arithmetic and the branch coverage -- and the port's fidelity to the Jinja
 macro it replaces was proved separately, before that macro was deleted, by
 tools/archive/yard_port_equivalence.py.
@@ -117,7 +117,7 @@ def test_fresh_yard_is_unset_not_overdue():
 
     THE FAILURE THIS CATCHES IS SILENT GREEN, in both directions: folding
     unset into overdue cries wolf on a brand new install, and folding it into
-    "fine" is the empty-inventory failure GH-543 records next door.
+    "fine" is the empty-inventory failure recorded elsewhere.
     """
     rows = task_rows(build())
     assert len(overdue_rows(rows)) == 0
@@ -149,7 +149,7 @@ def test_recorded_and_past_interval_is_overdue():
 def test_non_positive_interval_reads_unset_never_due_now(bad):
     """A cleared cadence must not make every task in the yard overdue at once.
 
-    LAW §10: a monitor whose blind spot correlates with what it monitors. If
+    a monitor whose blind spot correlates with what it monitors. If
     zero meant "due now", one bad write would fire a notification for every
     row simultaneously -- which reads exactly like a real emergency.
     """
@@ -169,7 +169,7 @@ def test_smallest_positive_interval_still_computes():
 
 
 def test_warm_season_suppresses_overseed_with_a_reason():
-    """A declined signal is STATED, never silently dropped (LAW §11)."""
+    """A declined signal is STATED, never silently dropped."""
     rows = task_rows(build(grass="Bermuda", dates={k: days_ago(400) for k in ALL_KEYS}))
     overseed = row(rows, "overseed")
     assert overseed["suppressed"]
@@ -264,7 +264,7 @@ def test_declared_plant_emits_two_clocks():
     ],
 )
 def test_season_type(grass, expected):
-    """`Mixed` resolves to unknown deliberately -- LAW §14, never guess."""
+    """`Mixed` resolves to unknown deliberately -- never guess."""
     assert season_type(grass) == expected
 
 
@@ -367,7 +367,7 @@ def test_sentinel_dates_read_as_unset():
 
 
 def test_the_suite_can_fail():
-    """LAW §4: an assertion set that cannot fail is not a gate.
+    """an assertion set that cannot fail is not a gate.
 
     Proves the table actually responds to its inputs rather than returning a
     constant that happens to satisfy everything above.

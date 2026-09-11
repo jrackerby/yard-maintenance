@@ -1,7 +1,7 @@
 """Stored yard state, and the coordinator that derives the table from it.
 
 UNLIKE EVERY OTHER COMPONENT IN THIS ESTATE, THERE IS NO SERVICE TO POLL. The
-state IS the integration: 87 `input_*` helpers became this file (GH-605). So
+state IS the integration: 87 `input_*` helpers became this file. So
 the coordinator's `_async_update_data` reads nothing external -- it recomputes
 the derived table from stored state and the clock, which is the only thing
 that moves on its own.
@@ -9,7 +9,7 @@ that moves on its own.
 THAT IS WHY THE REFRESH IS HOURLY AND NOT FASTER. Nothing here changes without
 either a write (which refreshes immediately) or the passage of time, and the
 table's finest unit is a whole day. A minute-by-minute poll would recompute an
-identical table 1,440 times to move `days_left` once. LAW §15's
+identical table 1,440 times to move `days_left` once. the rule about
 `appropriate-polling` wants the cadence justified by the payload, and the
 payload's own resolution is a day.
 
@@ -174,7 +174,7 @@ class YardCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     # -- mutation ---------------------------------------------------------
     # Every writer goes through one of these rather than reaching into
     # `self.state`, so persistence and republication cannot be forgotten at a
-    # call site (LAW §1: a key read by two code paths goes through one
+    # call site (a key read by two code paths goes through one
     # accessor -- the same applies to writes).
 
     async def async_set_date(self, key: str, value: float | None) -> None:
@@ -246,8 +246,8 @@ class YardCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         """Recompute the table.
 
-        NEVER RAISES `UpdateFailed`. There is no service to lose -- LAW §11's
-        contract, and §15's note that `entity-unavailable` governs a
+        NEVER RAISES `UpdateFailed`. There is no service to lose -- the rule about
+        contract, and the note that `entity-unavailable` governs a
         coordinator with something to be unavailable FROM, which this is not.
         A yard tracker that vanishes when it cannot compute is the monitor
         whose blind spot correlates with what it monitors.

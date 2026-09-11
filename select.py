@@ -47,7 +47,7 @@ class YardGrassTypeSelect(YardEntity, SelectEntity):
     renovation window, whether overseeding is part of the programme at all,
     and therefore what `sensor.yard_grass_program` says. `Mixed` resolves to
     unknown deliberately -- a mixed stand has no single renovation window, and
-    picking the larger half would be a guess dressed as a schedule (LAW §14).
+    picking the larger half would be a guess dressed as a schedule.
     """
 
     _attr_name = "Grass Type"

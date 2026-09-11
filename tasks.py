@@ -1,14 +1,14 @@
 """The yard maintenance task table. One definition, many readers.
 
-This is `custom_templates/yard_tasks.jinja` rewritten as Python (GH-605). The
+This is `a Jinja macro` rewritten as Python. The
 rule is unchanged; only the language and the failure mode are.
 
 WHY IT WAS A MACRO, AND WHY IT NO LONGER NEEDS TO BE. Five sensors needed the
 same answer -- which tasks are due, which are overdue, which have never been
 recorded, which do not apply to this lawn -- and writing that loop into each
-entity's own template is the defect `packages/hvac_maintenance.yaml` still
+entity's own template is the defect `an earlier YAML package` still
 carries: its due COUNT and its overdue_items ATTRIBUTE are two hand-copied
-transcriptions of one rule and nothing makes them move together (LAW §1: a
+transcriptions of one rule and nothing makes them move together (a
 config key read by two code paths goes through one accessor). A Jinja macro
 was the only way to write it once, and a macro can only return a STRING, so
 the table crossed into every reader as JSON and was parsed back.
@@ -19,7 +19,7 @@ syntax error in the macro took every reader unavailable at once, which is why
 on every push.
 
 THIS MODULE IMPORTS NOTHING FROM `homeassistant`, deliberately -- the same
-contract §11 puts on `household_state`'s resolver. It is a pure function of
+contract a resolver of this kind keeps. It is a pure function of
 its inputs, so the 45 table cases test it directly with no HA at all.
 
 ROW SHAPE -- unchanged from the macro, because the board reads it verbatim off
@@ -37,10 +37,10 @@ ROW SHAPE -- unchanged from the macro, because the board reads it verbatim off
   suppressed  reason string when this task does not apply here, else ''
 
 THREE STATES, NOT TWO. `unset`, `overdue` and neither are different facts
-(LAW §11: `ok at zero` and `could not read` do not collapse). A task nobody
+(`ok at zero` and `could not read` do not collapse). A task nobody
 has ever recorded is NOT overdue -- there is no anchor to be late against --
 but it is also not done, and a rollup reporting it green is the silent-empty
-failure GH-543 records for the receptacle inventory next door. Readers surface
+failure recorded for a receptacle inventory elsewhere. Readers surface
 unset separately; they never fold it into the due count.
 """
 
@@ -155,7 +155,7 @@ def season_type(grass_type: str) -> str:
 
     `Mixed` resolves to unknown DELIBERATELY. A mixed stand has no single
     renovation window, and picking the larger half would be a guess dressed as
-    a schedule (LAW §14: ask rather than guess about the physical world). The
+    a schedule (ask rather than guess about the physical world). The
     programme sensor says so in words instead.
     """
     if grass_type in COOL_SEASON:
@@ -207,7 +207,7 @@ def _row(
 
     An `interval` of 0 or less is treated as UNSET rather than as "due now".
     A non-positive cadence would otherwise make every row permanently overdue
-    and fire a notification for every task in the yard at once -- LAW §10, a
+    and fire a notification for every task in the yard at once -- a
     monitor whose blind spot correlates with what it monitors. This mattered
     more under the package, where an input_number that had not restored yet
     read 0; it is kept because a stored interval can still be cleared.
@@ -257,7 +257,7 @@ def task_rows(inputs: YardInputs) -> list[dict[str, Any]]:
     )
 
     for key, cadence in LAWN_CADENCE.items():
-        # ONE SUPPRESSION RULE, AND IT IS STATED RATHER THAN HIDDEN (LAW §11:
+        # ONE SUPPRESSION RULE, AND IT IS STATED RATHER THAN HIDDEN (
         # a declined signal is stated on the entity, never silently dropped).
         # Warm-season turf spreads by stolon and rhizome and is renovated by
         # aeration alone; scattering seed over it is not part of the

@@ -117,7 +117,7 @@ class YardDueCountSensor(YardEntity, SensorEntity):
             "unset_items": [r["label"] for r in unset_rows(rows)],
             "due_soon": [r["label"] for r in due_soon_rows(rows)],
             # A declined signal is STATED on the entity, never silently
-            # dropped (LAW §11), and it is stated with its reason attached.
+            # dropped, and it is stated with its reason attached.
             "suppressed": [
                 f"{r['label']} — {r['suppressed']}" for r in rows if r["suppressed"]
             ],
@@ -178,7 +178,7 @@ class YardDaysSinceMowSensor(YardEntity, SensorEntity):
     def native_value(self) -> int | None:
         """None when no mow has ever been recorded -- not zero.
 
-        Zero would read as "mowed today" on every surface in the estate.
+        Zero would read as "mowed today" on every surface.
         """
         last = self.coordinator.state["dates"].get("mow")
         if not last or last <= EPOCH_2000:
@@ -203,10 +203,10 @@ class YardDaysSinceMowSensor(YardEntity, SensorEntity):
 class YardBladeHoursSensor(YardEntity, SensorEntity):
     """Blade hours accumulated since the last change.
 
-    DERIVED HERE BECAUSE THE CLOUD WILL NOT GIVE IT (GH-548). Segway keeps
+    DERIVED HERE BECAUSE THE CLOUD WILL NOT GIVE IT. Segway keeps
     blade wear in the phone app and exposes none of it, so this is accumulated
     from the sessions this ledger closes and is a FLOOR, never a total -- any
-    cut the estate did not observe is missing from it. Stated on the entity as
+    cut the installation did not observe is missing from it. Stated on the entity as
     `basis` rather than left for a reader to assume.
     """
 

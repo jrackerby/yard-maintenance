@@ -1,8 +1,7 @@
-"""The estate's yard maintenance tracker.
+"""A yard maintenance tracker.
 
-Replaces `packages/yard_maintenance.yaml` (87 helpers, 5 template sensors, 3
-binary sensors, 4 automations, 3 scripts) and `custom_templates/
-yard_tasks.jinja`. GH-605.
+Replaces `an earlier YAML package` (87 helpers, 5 template sensors, 3
+binary sensors, 4 automations, 3 scripts) and a Jinja macro.
 
 WHAT MOVED AND WHAT DID NOT. The task rule moved verbatim into `tasks.py` and
 was proved identical against the macro before the macro was deleted. The two

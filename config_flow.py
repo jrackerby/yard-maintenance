@@ -3,7 +3,7 @@
 ONE YARD PER INSTALL. `async_abort` on a second entry rather than allowing
 several: every entity id here is unprefixed (`sensor.yard_next_task`), so a
 second entry would take `_2` on all of them and the board would keep reading
-the first one forever while the user edited the second (TOOLS.md).
+the first one forever while the user edited the second.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ def _schema(defaults: dict[str, Any]) -> vol.Schema:
     than typed. Optional because the tracker is useful with no mower at all --
     every task can be logged by hand -- and because pinning an entity id that
     does not exist yet is how a config flow certifies something green that was
-    never wired (LAW §9).
+    never wired.
     """
     return vol.Schema(
         {
@@ -100,7 +100,7 @@ class YardMaintenanceOptionsFlow(OptionsFlow):
             # MERGE OVER `entry.options`, NEVER RETURN ONLY THIS STEP'S KEYS.
             # `async_create_entry(data=...)` REPLACES options wholesale, so a
             # step returning its own keys deletes every other step's, silently
-            # and with no edit to point at (TOOLS.md). Harmless while there is
+            # and with no edit to point at. Harmless while there is
             # one step, which is exactly how it survives to the second.
             return self.async_create_entry(
                 data={
