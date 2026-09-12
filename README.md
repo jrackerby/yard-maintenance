@@ -1,3 +1,17 @@
+<p align="center">
+  <picture>
+    <!-- The wordmark is dark green and disappears on a dark ground, so which
+         file is the FALLBACK matters: HACS renders this README inside Home
+         Assistant's frontend, which is dark by default, and a renderer that
+         drops <source> lands on the <img>. The dark-safe variant is therefore
+         the img and the light one is the opt-in source, not the other way
+         round. The graphic itself is unchanged in both -- only the wordmark
+         is lifted. -->
+    <source media="(prefers-color-scheme: light)" srcset="brand/logo.png">
+    <img src="brand/logo-dark.png" alt="Yard Maintenance" width="420">
+  </picture>
+</p>
+
 # Yard Maintenance
 
 Tracks recurring lawn, turf and plant work against a per-task cadence; keeps a
