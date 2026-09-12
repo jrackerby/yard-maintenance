@@ -8,7 +8,7 @@
          round. The graphic itself is unchanged in both -- only the wordmark
          is lifted. -->
     <source media="(prefers-color-scheme: light)" srcset="brand/logo.png">
-    <img src="brand/logo-dark.png" alt="Yard Maintenance" width="420">
+    <img src="brand/dark_logo.png" alt="Yard Maintenance" width="420">
   </picture>
 </p>
 

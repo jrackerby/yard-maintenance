@@ -25,7 +25,8 @@ rules:
   # ^ Hourly. Nothing here changes without a write, which refreshes
   #   immediately; the only thing that moves on its own is the clock, and the
   #   table's finest unit is a whole day. See coordinator.py.
-  brands: todo  # no icon/logo submitted to home-assistant/brands; private integration
+  brands: done  # brand/ is served by core's own BrandsIntegrationView (2026.3+);
+                # no home-assistant/brands PR is owed for a custom integration
   common-modules: done  # coordinator.py, entity.py
   config-flow: done
   config-flow-test-coverage: todo  # needs pytest-homeassistant-custom-component

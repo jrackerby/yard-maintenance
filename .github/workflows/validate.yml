@@ -226,12 +226,21 @@ jobs:
       # `ignore:` would be hiding a green gate. `topics` and `license` were
       # never ignored for the same reason.
       #
-      # What this does NOT buy: the tile icon Home Assistant's own frontend
-      # draws beside the integration still comes from brands.home-assistant.io
-      # and nowhere else, so it needs an accepted PR against
-      # home-assistant/brands. `brand/` carries that PR's exact four files
-      # (icon.png, icon@2x.png, logo.png, logo@2x.png) at the sizes and with
-      # the transparency that repository requires, so making it is a copy.
+      # AND NO UPSTREAM PR IS OWED -- a custom integration SERVES ITS OWN
+      # brand images, and has since core 2026.3. Read out of core 2026.9.2:
+      # `Integration.has_branding` is `"brand" in self._top_level_files`, and
+      # `BrandsIntegrationView` (/api/brands/integration/<domain>/<image>)
+      # reads `Path(integration.file_path) / "brand"` FIRST, falling through to
+      # brands.home-assistant.io only when that misses. home-assistant/brands'
+      # `custom_integrations/` is legacy for this purpose.
+      #
+      # Two consequences worth keeping. The filenames are a FIXED SET
+      # (`ALLOWED_IMAGES`): icon.png, logo.png, their @2x, and dark_ variants
+      # of each -- a name outside it is never served however sensible it looks,
+      # which is why the dark wordmark here is `dark_logo.png` and not
+      # `logo-dark.png`. And `has_branding` is a cached_property read when the
+      # integration loads, so dropping the directory into an INSTALLED
+      # component serves nothing until core restarts.
       - uses: hacs/action@main
         if: ${{ !github.event.repository.private }}
         with:
