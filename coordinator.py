@@ -13,6 +13,13 @@ identical table 1,440 times to move `days_left` once. the rule about
 `appropriate-polling` wants the cadence justified by the payload, and the
 payload's own resolution is a day.
 
+THE ONE EXCEPTION IS A HOLD BOUNDARY. Holds are measured in hours, and a
+controller reading `binary_sensor.yard_irrigation_hold` an hour late waters
+an hour late. So after every recompute the coordinator books ONE point-in-time
+refresh at the next instant any hold can change truth value, and none when
+nothing is held. That is still zero polling: the timer fires exactly when the
+payload moves, and the hourly tick stays as it is for everything else.
+
 STORAGE, NOT RESTORESTATE. `RestoreEntity` would put each value back on its
 own entity, which is how the helpers worked and is exactly the shape that made
 them fragile: 87 independent restores with no way to validate them as a set,
@@ -25,7 +32,8 @@ import logging
 from datetime import timedelta
 from typing import Any
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CALLBACK_TYPE, HomeAssistant
+from homeassistant.helpers.event import async_track_point_in_utc_time
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.util import dt as dt_util
@@ -44,7 +52,14 @@ from .const import (
     STORAGE_VERSION,
     TURF_ROWS,
 )
-from .tasks import PlantSlot, YardInputs, renovation_window, task_rows
+from .tasks import (
+    PlantSlot,
+    YardInputs,
+    hold_rows,
+    next_hold_boundary,
+    renovation_window,
+    task_rows,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -154,6 +169,7 @@ class YardCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass, STORAGE_VERSION, f"{STORAGE_KEY}.{entry_id}"
         )
         self.state: dict[str, Any] = default_state(plant_slots)
+        self._unsub_hold_boundary: CALLBACK_TYPE | None = None
 
     async def async_load(self) -> None:
         """Read the document, or start a fresh one."""
@@ -253,10 +269,39 @@ class YardCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         whose blind spot correlates with what it monitors.
         """
         inputs = self._inputs()
+        holds = hold_rows(inputs)
+        self._schedule_hold_boundary(next_hold_boundary(holds, inputs.now))
         return {
             "rows": task_rows(inputs),
             "window": renovation_window(inputs.grass_type, inputs.month, inputs.day),
+            "holds": holds,
         }
+
+    def _schedule_hold_boundary(self, at: float | None) -> None:
+        """Book (or cancel) the one refresh a hold edge needs.
+
+        Always cancels the previous booking first: a recompute triggered by a
+        write may have moved the edge, and two timers for one edge are one
+        redundant recompute and one stale one.
+        """
+        if self._unsub_hold_boundary is not None:
+            self._unsub_hold_boundary()
+            self._unsub_hold_boundary = None
+        if at is None:
+            return
+
+        async def _async_at_boundary(_now: Any) -> None:
+            self._unsub_hold_boundary = None
+            await self.async_refresh()
+
+        self._unsub_hold_boundary = async_track_point_in_utc_time(
+            self.hass, _async_at_boundary, dt_util.utc_from_timestamp(at)
+        )
+
+    async def async_shutdown(self) -> None:
+        """Drop the hold timer along with the hourly one."""
+        self._schedule_hold_boundary(None)
+        await super().async_shutdown()
 
     @property
     def rows(self) -> list[dict[str, Any]]:
@@ -267,3 +312,8 @@ class YardCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def window(self) -> dict[str, Any]:
         """The renovation window as last derived."""
         return (self.data or {}).get("window", {})
+
+    @property
+    def holds(self) -> list[dict[str, Any]]:
+        """The hold table as last derived, active rows and lapsed ones alike."""
+        return (self.data or {}).get("holds", [])

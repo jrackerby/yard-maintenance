@@ -69,6 +69,11 @@ round_common = _tasks.round_common
 season_type = _tasks.season_type
 task_rows = _tasks.task_rows
 unset_rows = _tasks.unset_rows
+active_holds = _tasks.active_holds
+hold_rows = _tasks.hold_rows
+hold_until = _tasks.hold_until
+next_hold_boundary = _tasks.next_hold_boundary
+HOLDS = sys.modules[f"{_PKG}.const"].HOLDS
 
 # Frozen clock. Every expectation is written against this instant, so a suite
 # that passes today still passes in October -- a date-window test keyed on the
@@ -364,6 +369,143 @@ def test_sentinel_dates_read_as_unset():
         rows = task_rows(build(dates={"mow": stamp}, intervals={"mow": 7}))
         assert row(rows, "mow")["unset"] is True
         assert row(rows, "mow")["last"] == 0
+
+
+# -- holds ----------------------------------------------------------------
+#
+# Two consumers, two questions. Every case checks BOTH answers, because the
+# failure that matters is the one where they agree when they should not: a
+# fertiliser that holds the sprinklers (starving a feed of the water it
+# needs) or a weed treatment that lets the mower out (cutting off the leaf it
+# landed on).
+
+HOUR = 3600.0
+
+
+def hours_ago(n: float) -> float:
+    """Epoch seconds `n` hours before the frozen clock."""
+    return NOW_TS - n * HOUR
+
+
+def hold(rows, key):
+    """One hold row by key, or a readable failure."""
+    for r in rows:
+        if r["key"] == key:
+            return r
+    raise AssertionError(f"no hold {key!r}; keys={[r['key'] for r in rows]}")
+
+
+def test_fresh_yard_holds_nothing():
+    """No application, no stand-off -- and that is `off`, not unknown."""
+    rows = hold_rows(build())
+    assert rows == []
+    assert active_holds(rows, "mow") == []
+    assert active_holds(rows, "irrigation") == []
+    assert hold_until(rows, "mow") == 0
+    assert next_hold_boundary(rows, NOW_TS) is None
+
+
+def test_weed_control_holds_both_then_only_the_mower():
+    """Liquid post-emergent: dry leaf for a day, uncut leaf for two."""
+    fresh = hold_rows(build(dates={"weed_control": hours_ago(1)}))
+    assert hold(fresh, "weed_control")["mow"] is True
+    assert hold(fresh, "weed_control")["irrigation"] is True
+    assert hold(fresh, "weed_control")["kind"] == "chemical"
+
+    dried = hold_rows(build(dates={"weed_control": hours_ago(30)}))
+    assert hold(dried, "weed_control")["mow"] is True
+    assert hold(dried, "weed_control")["irrigation"] is False
+
+    lapsed = hold_rows(build(dates={"weed_control": hours_ago(50)}))
+    assert hold(lapsed, "weed_control")["mow"] is False
+    assert hold(lapsed, "weed_control")["irrigation"] is False
+    # The row is still emitted once lapsed -- a surface may want the history --
+    # but it is not ACTIVE for either consumer.
+    assert active_holds(lapsed, "mow") == []
+
+
+def test_granular_products_never_hold_irrigation():
+    """A feed, a pre-emergent and a grub treatment all WANT watering in.
+
+    THIS IS THE CASE THAT MUST NOT REGRESS. Holding the sprinklers after a
+    granular application is worse than no hold at all.
+    """
+    for key in ("fertilizer", "pre_emergent", "grub_control"):
+        rows = hold_rows(build(dates={key: hours_ago(1)}))
+        assert hold(rows, key)["mow"] is True, key
+        assert hold(rows, key)["irrigation"] is False, key
+        assert hold(rows, key)["irrigation_until"] == 0, key
+
+
+def test_overseed_is_a_three_week_maintenance_hold_on_the_mower_only():
+    """Seedlings are not cut and are never left dry."""
+    rows = hold_rows(build(dates={"overseed": days_ago(10)}))
+    assert hold(rows, "overseed")["kind"] == "maintenance"
+    assert hold(rows, "overseed")["mow"] is True
+    assert hold(rows, "overseed")["irrigation"] is False
+    assert hold_until(rows, "mow") == int(days_ago(10) + 21 * DAY)
+
+    grown = hold_rows(build(dates={"overseed": days_ago(22)}))
+    assert hold(grown, "overseed")["mow"] is False
+
+
+def test_tasks_outside_the_table_hold_nothing():
+    """Lime, a soil test and a cut are not stand-offs."""
+    rows = hold_rows(
+        build(dates={k: hours_ago(1) for k in ("lime", "soil_test", "mow", "edging")})
+    )
+    assert rows == []
+
+
+def test_sentinel_and_missing_dates_hold_nothing():
+    """The never-recorded floor is not an application at the epoch."""
+    for stamp in (0.0, EPOCH_2000, None):
+        rows = hold_rows(build(dates={"fungicide": stamp}))
+        assert rows == []
+
+
+def test_a_future_stamp_holds_nothing_until_it_arrives():
+    """A task logged for tomorrow is a plan; the hold starts when it does."""
+    rows = hold_rows(build(dates={"fungicide": NOW_TS + 2 * HOUR}))
+    assert hold(rows, "fungicide")["mow"] is False
+    assert hold(rows, "fungicide")["irrigation"] is False
+    assert next_hold_boundary(rows, NOW_TS) == NOW_TS + 2 * HOUR
+
+
+def test_active_holds_name_the_one_lifting_last():
+    """Two overlapping holds: the consumer waits on the later one."""
+    rows = hold_rows(
+        build(dates={"fungicide": hours_ago(20), "weed_control": hours_ago(10)})
+    )
+    mow = active_holds(rows, "mow")
+    assert [r["key"] for r in mow] == ["weed_control", "fungicide"]
+    assert hold_until(rows, "mow") == hold(rows, "weed_control")["mow_until"]
+    # Irrigation: fungicide's 24h dry window lifts in 4h, weed control's in 14h.
+    irrigation = active_holds(rows, "irrigation")
+    assert [r["key"] for r in irrigation] == ["weed_control", "fungicide"]
+
+
+def test_next_boundary_is_the_soonest_future_edge():
+    """The coordinator refreshes at the first edge, whichever consumer's."""
+    rows = hold_rows(
+        build(dates={"fungicide": hours_ago(20), "weed_control": hours_ago(10)})
+    )
+    # fungicide lifts both in 4h; that is the first thing that changes.
+    assert next_hold_boundary(rows, NOW_TS) == pytest.approx(hours_ago(20) + 24 * HOUR)
+    # Past every edge, nothing is left to wait for.
+    assert next_hold_boundary(rows, NOW_TS + 100 * HOUR) is None
+
+
+def test_unknown_hold_target_is_refused():
+    """A consumer nobody defined is a typo, not an empty answer."""
+    with pytest.raises(ValueError):
+        active_holds([], "sprinkler")
+
+
+def test_every_hold_key_is_a_dated_task():
+    """The hold table can only ever read a date the task table records."""
+    dated = {r["key"] for r in task_rows(build())}
+    assert set(HOLDS) <= dated, set(HOLDS) - dated
 
 
 def test_the_suite_can_fail():

@@ -58,6 +58,9 @@ from .const import (
     GROUP_LAWN,
     GROUP_PLANT,
     GROUP_TURF,
+    HOLD_TARGET_IRRIGATION,
+    HOLD_TARGET_MOW,
+    HOLDS,
     LAWN_CADENCE,
     LAWN_LABEL,
     SUPPRESS_OVERSEED_WARM,
@@ -352,3 +355,109 @@ def next_task(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not dated:
         return None
     return min(dated, key=lambda r: r["due"])
+
+
+# -- holds -----------------------------------------------------------------
+#
+# A hold is a window after a logged task during which one consumer -- the
+# mower or the irrigation controller -- should stand off. It is derived from
+# the same dates the task table reads, so logging a task is the only input and
+# there is no second ledger to keep honest.
+#
+# ROW SHAPE:
+#
+#   key               task key, as in the task table
+#   label             the task's label
+#   kind              chemical | maintenance
+#   since             epoch seconds the task was recorded
+#   mow_until         epoch seconds the mow hold lifts, 0 when the task holds
+#                     no mow
+#   irrigation_until  likewise for irrigation
+#   mow               true while the mow hold is ACTIVE at `now`
+#   irrigation        true while the irrigation hold is ACTIVE at `now`
+#
+# A task whose stamp is in the FUTURE (logged with a `when` ahead of the clock)
+# holds nothing until that stamp arrives -- the hold starts when the work does,
+# and a controller told to stand off for a job not yet done would be reading
+# a plan as a fact.
+
+
+def _hold_target(target: str) -> str:
+    """The row field a target reads. Fails loudly on a name nobody defined."""
+    if target == HOLD_TARGET_MOW:
+        return "mow"
+    if target == HOLD_TARGET_IRRIGATION:
+        return "irrigation"
+    raise ValueError(f"unknown hold target {target!r}")
+
+
+def hold_rows(inputs: YardInputs) -> list[dict[str, Any]]:
+    """Every hold the recorded dates imply, active or not.
+
+    Emits one row per task in HOLDS that has a recorded date, in HOLDS order.
+    A task never recorded (sentinel or missing) emits nothing: there is no
+    application to stand off from.
+    """
+    rows: list[dict[str, Any]] = []
+    labels = {**LAWN_LABEL, FERTILIZER_KEY: FERTILIZER_LABEL}
+    for key, (kind, mow_hours, irrigation_hours) in HOLDS.items():
+        since = _as_float(inputs.dates.get(key))
+        if since <= EPOCH_2000:
+            continue
+        mow_until = since + mow_hours * 3600 if mow_hours > 0 else 0.0
+        irrigation_until = (
+            since + irrigation_hours * 3600 if irrigation_hours > 0 else 0.0
+        )
+        started = since <= inputs.now
+        rows.append(
+            {
+                "key": key,
+                "label": labels[key],
+                "kind": kind,
+                "since": int(since),
+                "mow_until": int(mow_until),
+                "irrigation_until": int(irrigation_until),
+                "mow": started and inputs.now < mow_until,
+                "irrigation": started and inputs.now < irrigation_until,
+            }
+        )
+    return rows
+
+
+def active_holds(rows: list[dict[str, Any]], target: str) -> list[dict[str, Any]]:
+    """The holds currently standing `target` off, longest-remaining first.
+
+    Ordered so the first row is the one a surface should name: when a
+    fungicide and a weed treatment overlap, the consumer is held until the
+    LATER of the two lifts, and that is the reason worth printing.
+    """
+    field_name = _hold_target(target)
+    until = f"{field_name}_until"
+    return sorted(
+        (r for r in rows if r[field_name]),
+        key=lambda r: r[until],
+        reverse=True,
+    )
+
+
+def hold_until(rows: list[dict[str, Any]], target: str) -> int:
+    """Epoch seconds the last active hold on `target` lifts, 0 when none."""
+    active = active_holds(rows, target)
+    return active[0][f"{_hold_target(target)}_until"] if active else 0
+
+
+def next_hold_boundary(rows: list[dict[str, Any]], now: float) -> float | None:
+    """The next instant any hold's truth value can change, or None.
+
+    Either a hold starting (a future `since`) or one lifting. The coordinator
+    schedules a refresh here, because holds are measured in hours and the
+    table's own hourly cadence would otherwise leave a lifted hold reading
+    `on` for up to fifty-nine minutes.
+    """
+    edges = [
+        edge
+        for r in rows
+        for edge in (r["since"], r["mow_until"], r["irrigation_until"])
+        if edge > now
+    ]
+    return float(min(edges)) if edges else None
