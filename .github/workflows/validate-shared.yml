@@ -31,4 +31,3 @@ jobs:
     with:
       domain: "yard_maintenance"
       public: true
-      test-requirements: ""
