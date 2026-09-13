@@ -120,6 +120,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: YardConfigEntry) -> bool
         )
 
     entry.async_on_unload(entry.add_update_listener(_async_reload_entry))
+    # The coordinator books a point-in-time refresh at every hold boundary;
+    # an unload that leaves that timer standing refreshes a coordinator whose
+    # entities are gone.
+    entry.async_on_unload(coordinator.async_shutdown)
     return True
 
 

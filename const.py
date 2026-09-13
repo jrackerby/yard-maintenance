@@ -123,6 +123,46 @@ TURF_ROWS: Final[dict[str, tuple[str, int]]] = {
 LAWN_KEYS: Final[tuple[str, ...]] = (FERTILIZER_KEY,) + tuple(LAWN_CADENCE)
 DATED_KEYS: Final[tuple[str, ...]] = LAWN_KEYS + tuple(TURF_ROWS)
 
+# Holds: how long after a logged task the yard should be left alone, and by
+# whom. Two consumers read these -- an irrigation controller and a robotic
+# mower -- and each gets its own binary sensor, because "may I water?" and
+# "may I cut?" are different questions with different answers for the same
+# application. A granular product WANTS watering in (no irrigation hold) but
+# should settle before a mower deck disturbs it; a liquid post-emergent needs
+# a dry leaf for a day and an uncut one for two.
+#
+# Durations are in HOURS after the task's recorded time. 0 means that consumer
+# is not held by that task at all; a task absent from this table holds nothing.
+# These are label-conservative defaults, not observations, so like
+# LAWN_CADENCE they are constants: a product whose label says otherwise is a
+# reason to edit this line, and the line says why it is what it is.
+#
+# key -> (kind, mow_hours, irrigation_hours)
+HOLD_CHEMICAL: Final = "chemical"
+HOLD_MAINTENANCE: Final = "maintenance"
+HOLDS: Final[dict[str, tuple[str, float, float]]] = {
+    # Granular feed: water it in, mow once it has settled.
+    "fertilizer": (HOLD_CHEMICAL, 24, 0),
+    # Pre-emergent forms a barrier once watered in; do not disturb it first.
+    "pre_emergent": (HOLD_CHEMICAL, 24, 0),
+    # Liquid post-emergent: rain-fast inside a day, absorbed over two, and the
+    # leaf surface it landed on has to stay on the plant.
+    "weed_control": (HOLD_CHEMICAL, 48, 24),
+    # Granular insecticide: watered in to reach the root zone, then mow.
+    "grub_control": (HOLD_CHEMICAL, 24, 0),
+    # Contact and systemic fungicides both need a dry, uncut leaf for a day.
+    "fungicide": (HOLD_CHEMICAL, 24, 24),
+    # Cores break down under water and traffic; give a mower deck a few days
+    # of clearance so it is not shredding them.
+    "aeration": (HOLD_MAINTENANCE, 72, 0),
+    # Seedlings are cut only once established. Three weeks is the floor most
+    # seed labels give for a first mow; irrigation is REQUIRED throughout.
+    "overseed": (HOLD_MAINTENANCE, 24 * 21, 0),
+}
+
+HOLD_TARGET_MOW: Final = "mow"
+HOLD_TARGET_IRRIGATION: Final = "irrigation"
+
 GROUP_LAWN: Final = "lawn"
 GROUP_TURF: Final = "turf"
 GROUP_PLANT: Final = "plant"

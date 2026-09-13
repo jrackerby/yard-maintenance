@@ -75,6 +75,8 @@ goes unavailable.
 | `binary_sensor.yard_maintenance_overdue` | Anything past cadence. |
 | `binary_sensor.yard_blade_due` | Blade at rated life. **Unavailable** while the change date is unrecorded — unset is not `off`. |
 | `binary_sensor.yard_renovation_window_open` | Whether today is inside the aeration window. |
+| `binary_sensor.yard_mowing_hold` | `on` while a logged application or renovation says a mower should stay docked. See [Holds](#holds). |
+| `binary_sensor.yard_irrigation_hold` | `on` while a logged application says the sprinklers should skip. See [Holds](#holds). |
 
 ### Editable
 
@@ -107,6 +109,70 @@ data: {slot: 1, action: prune}
 action: yard_maintenance.blade_changed
 data: {at_hours: 12}
 ```
+
+## Holds
+
+Logging a task is also logging a stand-off. Two binary sensors read the same
+dates the task table reads and answer the two questions a controller actually
+asks — **may I water?** and **may I cut?** — one entity each, because the same
+application answers them differently: a granular feed *wants* watering in and
+should settle before a mower deck disturbs it; a liquid post-emergent needs a
+dry leaf for a day and an uncut one for two.
+
+| Task logged | Kind | Mower held | Irrigation held |
+| --- | --- | --- | --- |
+| `fertilizer` | chemical | 24 h | — |
+| `pre_emergent` | chemical | 24 h | — |
+| `weed_control` | chemical | 48 h | 24 h |
+| `grub_control` | chemical | 24 h | — |
+| `fungicide` | chemical | 24 h | 24 h |
+| `aeration` | maintenance | 72 h | — |
+| `overseed` | maintenance | 21 days | — |
+
+Lime, a soil test, and the turf cadences (mow, trim, edge) hold nothing. The
+durations are label-conservative defaults and live in one place, `HOLDS` in
+`const.py`, each with the reason it is what it is; a product whose label says
+otherwise is a reason to edit that line.
+
+Each hold sensor carries:
+
+| Attribute | Meaning |
+| --- | --- |
+| `holds` | The active holds, longest-remaining first: `key`, `label`, `kind`, `since`, `until`. |
+| `reason` | The label of the hold that lifts last — the one the consumer is actually waiting on. |
+| `until` | When that hold lifts, ISO-8601 in the installation's timezone; `null` when `off`. A controller's own "delay until" field can take it as-is. |
+| `chemical`, `maintenance` | Whether any active hold is of that kind. |
+
+A hold is exact to the second, not to the hourly recompute: the integration
+books one refresh at the next instant any hold can change, so a 24-hour hold
+lifts at hour 24, not at the next tick. A task logged with a `when` in the
+future holds nothing until that time arrives — the hold starts when the work
+does.
+
+Wiring is a condition, not a template:
+
+```yaml
+# Skip a scheduled watering while held.
+condition:
+  - condition: state
+    entity_id: binary_sensor.yard_irrigation_hold
+    state: "off"
+```
+
+```yaml
+# Send the mower home the moment a hold begins, and keep it there.
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.yard_mowing_hold
+    to: "on"
+actions:
+  - action: lawn_mower.dock
+    target:
+      entity_id: lawn_mower.navimow
+```
+
+There is no device class on either sensor. `problem` would paint a correctly
+observed stand-off as a fault; a hold is the yard working as recorded.
 
 ## The mow ledger
 
@@ -178,7 +244,9 @@ Delete the config entry. Its stored document lives at
 
 There is no service to poll. The table is recomputed on every write, and
 otherwise **hourly**, because the only thing that moves on its own is the clock
-and the table's finest unit is a whole day.
+and the table's finest unit is a whole day. The one exception is a hold
+boundary: after every recompute, one point-in-time refresh is booked for the
+next instant a hold starts or lifts, and none when nothing is held.
 
 ## Tests
 
@@ -186,7 +254,7 @@ and the table's finest unit is a whole day.
 tools/run_tests.sh
 ```
 
-43 cases over the pure table, with no Home Assistant present — `tasks.py` and
+54 cases over the pure table and the hold rule, with no Home Assistant present — `tasks.py` and
 `const.py` import nothing from `homeassistant`, and the suite loads them by
 file path so that stays true.
 

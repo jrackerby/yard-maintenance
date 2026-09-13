@@ -1,4 +1,4 @@
-"""The three yard problem signals."""
+"""The three yard problem signals, and the two stand-off signals."""
 
 from __future__ import annotations
 
@@ -12,11 +12,19 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from homeassistant.util import dt as dt_util
+
 from . import YardConfigEntry
-from .const import EPOCH_2000
+from .const import (
+    EPOCH_2000,
+    HOLD_CHEMICAL,
+    HOLD_MAINTENANCE,
+    HOLD_TARGET_IRRIGATION,
+    HOLD_TARGET_MOW,
+)
 from .coordinator import YardCoordinator
 from .entity import YardEntity
-from .tasks import overdue_rows
+from .tasks import active_holds, hold_until, overdue_rows
 
 
 async def async_setup_entry(
@@ -31,6 +39,8 @@ async def async_setup_entry(
             YardOverdueBinarySensor(coordinator),
             YardBladeDueBinarySensor(coordinator),
             YardRenovationWindowBinarySensor(coordinator),
+            YardMowingHoldBinarySensor(coordinator),
+            YardIrrigationHoldBinarySensor(coordinator),
         ]
     )
 
@@ -147,3 +157,103 @@ class YardRenovationWindowBinarySensor(YardEntity, BinarySensorEntity):
             "season": window.get("season", "unknown"),
             "overseed_applies": window.get("overseed"),
         }
+
+
+class YardHoldBinarySensor(YardEntity, BinarySensorEntity):
+    """`on` while a logged task is holding one consumer off the lawn.
+
+    ONE ENTITY PER CONSUMER, NOT ONE PER HOLD. An irrigation controller asks
+    "may I water?" and a robotic mower asks "may I cut?"; each wants a single
+    boolean it can gate on, and the same application answers the two
+    differently (a granular feed wants water and no mower). Which holds are
+    behind the answer, and of what kind, are attributes -- the row a surface
+    names is the one that lifts LAST, because that is the one the consumer is
+    actually waiting on.
+
+    NO DEVICE CLASS, DELIBERATELY. `problem` would paint a correctly observed
+    stand-off as a fault; a hold is the yard working as recorded.
+
+    Never unavailable. A yard with no logged applications has no holds, which
+    is `off` and a fact, not an unknown.
+    """
+
+    _target: str
+
+    def __init__(self, coordinator: YardCoordinator, key: str) -> None:
+        """Bind."""
+        super().__init__(coordinator, key)
+
+    @property
+    def _active(self) -> list[dict[str, Any]]:
+        return active_holds(self.coordinator.holds, self._target)
+
+    @property
+    def is_on(self) -> bool:
+        """True while any hold on this consumer is inside its window."""
+        return bool(self._active)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Which holds, of what kind, and when the last of them lifts.
+
+        `until` is ISO-8601 in the installation's timezone or None, so a
+        controller's own "delay until" field can take it as-is. `holds` is
+        the active rows only, longest-remaining first.
+        """
+        active = self._active
+        until = hold_until(self.coordinator.holds, self._target)
+        until_field = f"{self._target}_until"
+        return {
+            "holds": [
+                {
+                    "key": r["key"],
+                    "label": r["label"],
+                    "kind": r["kind"],
+                    "since": dt_util.as_local(
+                        dt_util.utc_from_timestamp(r["since"])
+                    ).isoformat(),
+                    "until": dt_util.as_local(
+                        dt_util.utc_from_timestamp(r[until_field])
+                    ).isoformat(),
+                }
+                for r in active
+            ],
+            "reason": active[0]["label"] if active else None,
+            "until": (
+                dt_util.as_local(dt_util.utc_from_timestamp(until)).isoformat()
+                if until
+                else None
+            ),
+            "chemical": any(r["kind"] == HOLD_CHEMICAL for r in active),
+            "maintenance": any(r["kind"] == HOLD_MAINTENANCE for r in active),
+        }
+
+
+class YardMowingHoldBinarySensor(YardHoldBinarySensor):
+    """Whether a robotic mower should stay docked."""
+
+    _target = HOLD_TARGET_MOW
+    entity_description = BinarySensorEntityDescription(
+        key="mowing_hold",
+        name="Mowing Hold",
+        icon="mdi:robot-mower",
+    )
+
+    def __init__(self, coordinator: YardCoordinator) -> None:
+        """Bind."""
+        super().__init__(coordinator, "mowing_hold")
+
+
+class YardIrrigationHoldBinarySensor(YardHoldBinarySensor):
+    """Whether an irrigation controller should skip its next run."""
+
+    _target = HOLD_TARGET_IRRIGATION
+    entity_description = BinarySensorEntityDescription(
+        key="irrigation_hold",
+        name="Irrigation Hold",
+        icon="mdi:water-off",
+    )
+
+    def __init__(self, coordinator: YardCoordinator) -> None:
+        """Bind."""
+        super().__init__(coordinator, "irrigation_hold")
