@@ -145,7 +145,10 @@ Each hold sensor carries:
 
 A hold is exact to the second, not to the hourly recompute: the integration
 books one refresh at the next instant any hold can change, so a 24-hour hold
-lifts at hour 24, not at the next tick. A task logged with a `when` in the
+lifts at hour 24, not at the next tick. While a hold is pending, that booking
+is renewed at least every 15 minutes rather than made once, hours ahead — a
+far-horizon booking is the one that was seen to lapse late (issue #14), and a
+near one lands on the instant. A task logged with a `when` in the
 future holds nothing until that time arrives — the hold starts when the work
 does.
 
@@ -246,7 +249,9 @@ There is no service to poll. The table is recomputed on every write, and
 otherwise **hourly**, because the only thing that moves on its own is the clock
 and the table's finest unit is a whole day. The one exception is a hold
 boundary: after every recompute, one point-in-time refresh is booked for the
-next instant a hold starts or lifts, and none when nothing is held.
+next instant a hold starts or lifts — or, while that instant is more than 15
+minutes away, for the end of that window, so the booking carrying the whole
+mechanism is always a short one. None is booked when nothing is held.
 
 ## Tests
 
@@ -254,7 +259,7 @@ next instant a hold starts or lifts, and none when nothing is held.
 tools/run_tests.sh
 ```
 
-54 cases over the pure table and the hold rule, with no Home Assistant present — `tasks.py` and
+59 cases over the pure table and the hold rule, with no Home Assistant present — `tasks.py` and
 `const.py` import nothing from `homeassistant`, and the suite loads them by
 file path so that stays true.
 
