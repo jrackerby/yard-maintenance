@@ -160,6 +160,29 @@ HOLDS: Final[dict[str, tuple[str, float, float]]] = {
     "overseed": (HOLD_MAINTENANCE, 24 * 21, 0),
 }
 
+# The longest a booked hold re-evaluation may sit unrenewed, in seconds.
+#
+# A CEILING ON HOW FAR AHEAD A BOOKING IS MADE, NOT A POLL. The coordinator
+# books one point-in-time refresh at the next instant a hold can change truth
+# value, and that single timer is the entire mechanism.
+#
+# What the installation showed (2026-09, issue #14): a booking made minutes
+# ahead fires to the millisecond -- the mowing hold read `off` 1 ms after its
+# own `until`. Bookings made HOURS ahead did not: the irrigation hold lifted 60
+# minutes late on 2026-09-13 and the mowing hold 42 minutes late on 2026-09-14,
+# both cleared by an unrelated refresh rather than by their own edge, on code
+# that had already booked those edges. The far-horizon timer is the part that
+# has never been seen to work.
+#
+# So no booking is made further out than this. A pending hold becomes a chain
+# of short timers, each firing on time and booking the next, and the edge
+# itself is still scheduled exactly once it is inside the cap. A timer that
+# fires late now costs the lateness rather than a whole hour of it, and one
+# dropped outright is still caught by the hourly tick, as before. NOTHING is
+# booked when no hold is pending, which is most of the year, and a recompute
+# reads nothing external and costs 0.000 s.
+HOLD_BOUNDARY_MAX_HORIZON: Final = 900.0
+
 HOLD_TARGET_MOW: Final = "mow"
 HOLD_TARGET_IRRIGATION: Final = "irrigation"
 

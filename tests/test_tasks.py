@@ -73,6 +73,8 @@ active_holds = _tasks.active_holds
 hold_rows = _tasks.hold_rows
 hold_until = _tasks.hold_until
 next_hold_boundary = _tasks.next_hold_boundary
+hold_refresh_at = _tasks.hold_refresh_at
+HOLD_BOUNDARY_MAX_HORIZON = sys.modules[f"{_PKG}.const"].HOLD_BOUNDARY_MAX_HORIZON
 HOLDS = sys.modules[f"{_PKG}.const"].HOLDS
 
 # Frozen clock. Every expectation is written against this instant, so a suite
@@ -494,6 +496,65 @@ def test_next_boundary_is_the_soonest_future_edge():
     assert next_hold_boundary(rows, NOW_TS) == pytest.approx(hours_ago(20) + 24 * HOUR)
     # Past every edge, nothing is left to wait for.
     assert next_hold_boundary(rows, NOW_TS + 100 * HOUR) is None
+
+
+def test_a_near_edge_is_booked_to_the_instant():
+    """Inside the cap, the recompute is the edge itself and not a round number.
+
+    This is the whole promise of the hold sensors: a controller asking "may I
+    cut?" gets the answer within milliseconds of the lawn actually being free,
+    not at the top of the next hour.
+    """
+    rows = hold_rows(build(dates={"weed_control": hours_ago(47.9)}))
+    edge = next_hold_boundary(rows, NOW_TS)
+    assert edge - NOW_TS < HOLD_BOUNDARY_MAX_HORIZON
+    assert hold_refresh_at(rows, NOW_TS) == edge
+
+
+def test_a_distant_edge_is_renewed_rather_than_trusted():
+    """A booking is never left standing for hours.
+
+    The single point-in-time timer IS the mechanism, so one that is lost reads
+    `on` until something unrelated refreshes -- which is how #14's mowing hold
+    lifted 42 minutes late. Capping the horizon bounds that to the cap.
+    """
+    rows = hold_rows(build(dates={"weed_control": hours_ago(1)}))
+    edge = next_hold_boundary(rows, NOW_TS)
+    assert edge - NOW_TS > HOLD_BOUNDARY_MAX_HORIZON, "picked a near edge by mistake"
+    assert hold_refresh_at(rows, NOW_TS) == NOW_TS + HOLD_BOUNDARY_MAX_HORIZON
+
+
+def test_the_renewal_never_overshoots_the_edge():
+    """The cap may only ever pull a recompute EARLIER, never past the edge.
+
+    A cap that rounded up would be the original defect with a smaller number
+    on it, so this holds across the whole run-up to a 48 h hold.
+    """
+    for elapsed in (0.1, 1, 6, 23, 24, 30, 47, 47.5, 47.99):
+        rows = hold_rows(build(dates={"weed_control": hours_ago(elapsed)}))
+        edge = next_hold_boundary(rows, NOW_TS)
+        at = hold_refresh_at(rows, NOW_TS)
+        assert at is not None
+        assert NOW_TS < at <= edge, (elapsed, at, edge)
+
+
+def test_a_yard_holding_nothing_books_nothing():
+    """No hold pending is no timer at all -- the cap is not a poll.
+
+    Both legs matter: a fresh yard, and one whose every hold has lapsed.
+    """
+    assert hold_refresh_at(hold_rows(build()), NOW_TS) is None
+    lapsed = hold_rows(build(dates={"weed_control": hours_ago(60)}))
+    assert lapsed, "expected a lapsed row, not an empty table"
+    assert hold_refresh_at(lapsed, NOW_TS) is None
+
+
+def test_a_future_stamp_is_booked_at_its_start():
+    """A task logged ahead of the clock books the moment it starts holding."""
+    rows = hold_rows(build(dates={"weed_control": NOW_TS + 5 * HOUR}))
+    assert hold_refresh_at(rows, NOW_TS) == NOW_TS + HOLD_BOUNDARY_MAX_HORIZON
+    close = NOW_TS + 5 * HOUR - 60
+    assert hold_refresh_at(rows, close) == pytest.approx(NOW_TS + 5 * HOUR)
 
 
 def test_unknown_hold_target_is_refused():

@@ -58,6 +58,7 @@ from .const import (
     GROUP_LAWN,
     GROUP_PLANT,
     GROUP_TURF,
+    HOLD_BOUNDARY_MAX_HORIZON,
     HOLD_TARGET_IRRIGATION,
     HOLD_TARGET_MOW,
     HOLDS,
@@ -461,3 +462,23 @@ def next_hold_boundary(rows: list[dict[str, Any]], now: float) -> float | None:
         if edge > now
     ]
     return float(min(edges)) if edges else None
+
+
+def hold_refresh_at(
+    rows: list[dict[str, Any]],
+    now: float,
+    horizon: float = HOLD_BOUNDARY_MAX_HORIZON,
+) -> float | None:
+    """When the coordinator should next recompute for the holds' sake.
+
+    The edge itself when it is near, and otherwise `horizon` seconds out --
+    which is a RENEWAL, not a poll: it exists so the one timer carrying the
+    whole mechanism is never more than `horizon` old, and a booking that is
+    lost or fires late costs the cap rather than "until something unrelated
+    writes". None when no hold has an edge left, so a yard holding nothing
+    books nothing at all.
+    """
+    boundary = next_hold_boundary(rows, now)
+    if boundary is None:
+        return None
+    return min(boundary, now + horizon)

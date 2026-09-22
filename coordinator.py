@@ -20,6 +20,17 @@ refresh at the next instant any hold can change truth value, and none when
 nothing is held. That is still zero polling: the timer fires exactly when the
 payload moves, and the hourly tick stays as it is for everything else.
 
+THE FAR-HORIZON BOOKING IS THE PART THAT HAS NEVER WORKED. A booking made
+minutes ahead fires to the millisecond on the installation; ones made hours
+ahead lifted the irrigation hold 60 minutes late on 2026-09-13 and the mowing
+hold 42 minutes late on 2026-09-14, each cleared in the end by an unrelated
+refresh rather than by its own edge -- issue #14, on code that had already
+booked those edges. So the booking is CAPPED at `HOLD_BOUNDARY_MAX_HORIZON`
+(`hold_refresh_at`): a pending hold becomes a chain of short timers, each
+firing on time and booking the next, and the edge itself is still scheduled to
+the instant once it is inside the cap. Nothing is booked while no hold is
+pending, so the "zero polling" claim above stands for the rest of the year.
+
 STORAGE, NOT RESTORESTATE. `RestoreEntity` would put each value back on its
 own entity, which is how the helpers worked and is exactly the shape that made
 them fragile: 87 independent restores with no way to validate them as a set,
@@ -55,8 +66,8 @@ from .const import (
 from .tasks import (
     PlantSlot,
     YardInputs,
+    hold_refresh_at,
     hold_rows,
-    next_hold_boundary,
     renovation_window,
     task_rows,
 )
@@ -270,7 +281,7 @@ class YardCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         inputs = self._inputs()
         holds = hold_rows(inputs)
-        self._schedule_hold_boundary(next_hold_boundary(holds, inputs.now))
+        self._schedule_hold_boundary(hold_refresh_at(holds, inputs.now))
         return {
             "rows": task_rows(inputs),
             "window": renovation_window(inputs.grass_type, inputs.month, inputs.day),
@@ -283,6 +294,11 @@ class YardCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         Always cancels the previous booking first: a recompute triggered by a
         write may have moved the edge, and two timers for one edge are one
         redundant recompute and one stale one.
+
+        `at` is the edge itself when it is near and a renewal otherwise (see
+        `hold_refresh_at`), so this method cannot tell the two apart -- and does
+        not need to: either way the recompute it triggers re-books from what it
+        then finds.
         """
         if self._unsub_hold_boundary is not None:
             self._unsub_hold_boundary()
